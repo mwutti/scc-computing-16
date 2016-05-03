@@ -10,14 +10,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 
-//print 2dArray
-void printArray(int **pArray, int m, int n) {
+typedef struct YSMF {
+    int m;
+    int n;
+    int nonZeros;
+    int *a;
+    int *ai;
+    int *aj;
+} YSMF;
+
+void printMatrix(int **pArray, int m, int n) {
     int i;
     int j;
     for ( i = 0 ; i < m ; i++ ) {
         for ( j = 0; j < n; j++ ) {
-
             printf("%d ", pArray[i][j]);
         }
         printf("\n");
@@ -25,15 +33,29 @@ void printArray(int **pArray, int m, int n) {
     printf("\n");
 }
 
-int** arrayAlloc(int m, int n) {
+int** initSparseMatrix(int m, int n, double perc) {
+    const int nonZeroCount = m * n * perc;
     int **a = (int**)malloc(m * sizeof(int *));
+    
     int i;
     for (i = 0 ; i < m; i++ ) {
-        a[i] =(int *) malloc(n * sizeof(int));
+        a[i] =(int *) calloc(n * sizeof(int), sizeof(int));
+    }
+    
+    //set nonZeroCount x random value into random place in matrices
+    srand(time(NULL));
+    printf("nonZeroCount %d\n", nonZeroCount);
+    for (i = 0; i < nonZeroCount; i++) {
+        int randM, randN;
+        do {
+            randM = rand() % m;
+            randN = rand() % n;
+        } while (a[randM][randN] != 0);
+        
+        a[randM][randN] = rand() % 9 + 1;
     }
     return a;
 }
-
 
 int main( int argc, const char* argv[] ) {
     //arg[0], arg[1] -> m x n
@@ -48,9 +70,6 @@ int main( int argc, const char* argv[] ) {
     const int n = atoi(argv[2]);
     const double perc = atof(argv[3]);
     const int numThreads = atoi(argv[4]);
-    //# of nonZeroValues in the matrices truncated
-    const int nonZeroCount = m * n * perc;
-
     
     //Validation
     if ( perc < 0.0 || perc > 1.0 ) {
@@ -66,36 +85,44 @@ int main( int argc, const char* argv[] ) {
     if ( m <= 0 || n <= 0 ) {
         printf("m and n must be positive");
         return -1;
+    }//Validation
+    
+    //Init Sparse Matrices
+    int **a = initSparseMatrix(m, n, perc);
+    int **b = initSparseMatrix(m, n, perc);
+    printMatrix(a, m, n);
+    YSMF ya;
+    ya.m = m;
+    ya.n = n;
+    //storage has to be reallocated in case of unknown matrices
+    ya.nonZeros = m * n * perc;
+    //create YSMF
+    ya.a = malloc(ya.nonZeros * sizeof(int));
+    ya.ai = malloc((ya.m + 1) * sizeof(int));
+    ya.aj = malloc(ya.n * sizeof(int));
+    
+    int i,j;
+    int indexA = 0;
+    int indexAI = 0;
+    int indexAJ = 0;
+    
+    for ( i = 0; i < m; i++ ) {
+        for (j = 0; j < n; j++) {
+            if ( a[i][j] != 0 ) {
+                ya.a[indexA++] = a[i][j];
+                ya.aj[indexAJ++] = j;
+            }
+        }
     }
     
-    //initialize Matrices in heap, stack does not hold tons of MB
-    //m,n not know during compile time -> manually initialize arrays
-    int **a = arrayAlloc(m,n);
-    int **b = arrayAlloc(m,n);
-    a = (int**)malloc(m * sizeof(int *));
-    
-    int i = 0;
-    for (i = 0 ; i < m; i++ ) {
-        a[i] =(int *) malloc(n * sizeof(int));
+    //print oneD- Array
+    for (i = 0; i < ya.nonZeros; i++) {
+        printf("%d ", ya.a[i]);
     }
-    
-    //set nonZeroCount x random value into random place in matrices
-    srand(time(NULL));
-    for (i = 0; i < nonZeroCount; i++) {
-        int randMA = rand() % m;
-        int randNA = rand() % n;
-        int randMB = rand() % m;
-        int randNB = rand() % n;
-    
-        a[randMA][randNA] = rand() % 9;
-        b[randMB][randNB] = rand() % 9;
-    }
-    
-    //printArray(a, m, n);
-    //printArray(b, m, n);
-    printf("finished");
     return 0;
 }
+
+
 
 
 

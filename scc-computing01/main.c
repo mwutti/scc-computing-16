@@ -29,14 +29,14 @@ typedef struct YSMF {
  * nonZeros number of non zero elements in matrix (easier allocation of ai and aj)
  */
 YSMF *initYaleMatrix(int** matrix, int m, int n, int nonZeros) {
-    YSMF *yaleMatrix = (YSMF *)malloc (sizeof(YSMF ));
+    YSMF *yaleMatrix = (YSMF *)malloc(sizeof(YSMF));
     if ( yaleMatrix == NULL ) {
         return NULL;
     }
     
-    yaleMatrix->aj = (int *)malloc(nonZeros * sizeof(int ));
-    yaleMatrix->ai = (int *)malloc((m+1) * sizeof(int ));
-    yaleMatrix->a = (int *)malloc(nonZeros * sizeof(int ));
+    yaleMatrix->aj = (int *)malloc(nonZeros * sizeof(int));
+    yaleMatrix->ai = (int *)malloc((m+1) * sizeof(int));
+    yaleMatrix->a = (int *)malloc(nonZeros * sizeof(int));
     
     if ( yaleMatrix->a == NULL ) {
         free(yaleMatrix);
@@ -193,6 +193,88 @@ int** addSimple(int **a, int **b, int m, int n) {
     return c;
 }
 
+YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
+    YSMF *yaleMatrix = (YSMF *)malloc(sizeof(YSMF));
+    int i, j;
+    if ( yaleMatrix == NULL ) {
+        return NULL;
+    }
+    
+    yaleMatrix->aj = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros)* sizeof(int));
+    yaleMatrix->ai = (int *)malloc((yaleMatrixA->m+1) * sizeof(int));
+    yaleMatrix->a = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
+    
+    yaleMatrix->m = yaleMatrixA->m;
+    yaleMatrix->n = yaleMatrixA->n;
+    
+    if ( yaleMatrix->a == NULL ) {
+        free(yaleMatrix);
+        return NULL;
+    }
+    
+    if ( yaleMatrix->aj == NULL ) {
+        free(yaleMatrix->a);
+        free(yaleMatrix);
+        return NULL;
+    }
+    
+    if ( yaleMatrix->ai == NULL ) {
+        free(yaleMatrix->a);
+        free(yaleMatrix->aj);
+        free(yaleMatrix);
+        return NULL;
+    }
+    //Convert every row into simple, add, insert into YSMF
+    //iterate over all a[i]
+    int indexA = 0, indexAI=1, indexAJ=0, indexAA = 0, indexAB= 0, indexAJA = 0, indexAJB = 0, globalNonZeros = 0;
+    yaleMatrix->ai[0] = 0;
+    for ( i = 1; i < yaleMatrixA->m +1; i++ ) {
+        // temp row i
+        int *temp = calloc(yaleMatrixA->m, sizeof(int));
+        int *tempYaleA = calloc(yaleMatrixA->m, sizeof(int));
+        int *tempYaleB = calloc(yaleMatrixA->m, sizeof(int));
+        
+        int nonZerosA = yaleMatrixA->ai[i] - yaleMatrixA->ai[i-1];
+        int nonZerosB = yaleMatrixB->ai[i] - yaleMatrixB->ai[i-1];
+        
+        //create simple row for YaleA
+        for ( j = 0; j < nonZerosA; j++ ) {
+            tempYaleA[yaleMatrixA->aj[indexAJA++]] = yaleMatrixA->a[indexAA++];
+        }
+        
+        for ( j = 0; j < nonZerosB; j++ ) {
+            tempYaleB[yaleMatrixB->aj[indexAJB++]] = yaleMatrixB->a[indexAB++];
+        }
+        
+        // result of temp rows added
+        for ( j = 0; j < yaleMatrixA->m; j++ ) {
+            temp[j] = tempYaleA[j] + tempYaleB[j];
+        }
+        
+        //write result back to YSMF
+        int nonZeros = 0;
+        for ( j = 0; j < yaleMatrixA->m; j++ ) {
+            if ( temp[j] != 0 ) {
+                yaleMatrix->a[indexA++] = temp[j];
+                yaleMatrix->aj[indexAJ++] = j;
+                nonZeros++;
+            }
+        }
+        yaleMatrix->ai[indexAI] = yaleMatrix->ai[indexAI -1] + nonZeros;
+        indexAI++;
+        globalNonZeros += nonZeros;
+        
+        free(temp);
+        free(tempYaleA);
+        free(tempYaleB);
+    }
+    
+    yaleMatrix->nonZeros = globalNonZeros;
+    // TODO realloc
+    
+    return yaleMatrix;
+}
+
 int main( int argc, const char* argv[] ) {
     //arg[0], arg[1] -> m x n
     //arg[2] perc. of non 0 values
@@ -206,7 +288,7 @@ int main( int argc, const char* argv[] ) {
     const int n = atoi(argv[2]);
     const double perc = atof(argv[3]);
     const int numThreads = atoi(argv[4]);
-    
+    int i, j;
     //Validation
     if ( perc < 0.0 || perc > 1.0 ) {
         printf("percentage invalid: must be a value between 0.0 and 0.99999\n");
@@ -228,22 +310,42 @@ int main( int argc, const char* argv[] ) {
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
     printMatrix(a, m, n);
-    printMatrix(b, m, n);
+    //printMatrix(b, m, n);
     printf("\n");
     
     //Create YSMF
     YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     YSMF *yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
     //printYaleMatrix(yaleMatrixA);
-    //int **matrix = convertFromYale(yaleMatrixA);
     //printf("\n");
+    //printYaleMatrix(yaleMatrixB);
+    //int **matrix = convertFromYale(yaleMatrixA);
+    printf("\n");
     //printMatrix(matrix, m, n);
     
     //ADD matrices simple
     int **c = addSimple(a, b, m, n);
-    
     printMatrix(c, m, n);
+    //add matrices in YSMF
+    YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
     
+
+    printYaleMatrix(yaleMatrixC);
+    printf("\n");
+    //convert back to simple format
+    int **cFromYale = convertFromYale(yaleMatrixC);
+    printMatrix(cFromYale, m, n);
+    
+    //thus c from simple addition and cFromYale (Addition) must have same values
+    for ( i = 0; i < m; i++ ) {
+        for ( j = 0; j < n; j++ ) {
+            if ( c[i][j] != cFromYale[i][j] ) {
+                printf("Something went wrong :-(\n");
+                break;
+            }
+        }
+    }
+
     return 0;
 }
 

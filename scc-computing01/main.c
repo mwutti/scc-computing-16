@@ -21,18 +21,115 @@ typedef struct YSMF {
     int *aj;
 } YSMF;
 
-void printMatrix(int **pArray, int m, int n) {
+/**
+ * Creates a YSMF from given matrix a
+ * matrix sparse matrix
+ * m Number of Rows of matrix
+ * n Number of Columns of matrix
+ * nonZeros number of non zero elements in matrix (easier allocation of ai and aj)
+ */
+YSMF *initYaleMatrix(int** matrix, int m, int n, int nonZeros) {
+    YSMF *yaleMatrix = (YSMF *)malloc (sizeof(YSMF ));
+    if ( yaleMatrix == NULL ) {
+        return NULL;
+    }
+    
+    yaleMatrix->aj = (int *)malloc(nonZeros * sizeof(int ));
+    yaleMatrix->ai = (int *)malloc((m+1) * sizeof(int ));
+    yaleMatrix->a = (int *)malloc(nonZeros * sizeof(int ));
+    
+    if ( yaleMatrix->a == NULL ) {
+        free(yaleMatrix);
+        return NULL;
+    }
+    
+    if ( yaleMatrix->aj == NULL ) {
+        free(yaleMatrix->a);
+        free(yaleMatrix);
+        return NULL;
+    }
+    
+    if ( yaleMatrix->ai == NULL ) {
+        free(yaleMatrix->a);
+        free(yaleMatrix->aj);
+        free(yaleMatrix);
+        return NULL;
+    }
+    
+    int i,j;
+    int indexA = 0;
+    int indexAI = 1;
+    int indexAJ = 0;
+    
+    yaleMatrix->ai[0] = 0;
+    for ( i = 0; i < m; i++ ) {
+        int nonZeroCount = 0;
+        for (j = 0; j < n; j++) {
+            if ( matrix[i][j] != 0 ) {
+                yaleMatrix->a[indexA++] = matrix[i][j];
+                yaleMatrix->aj[indexAJ++] = j;
+                nonZeroCount++;
+            }
+        }
+        yaleMatrix->ai[indexAI] = yaleMatrix->ai[indexAI-1] + nonZeroCount;
+        indexAI++;
+    }
+    
+    yaleMatrix->m = m;
+    yaleMatrix->n = n;
+    yaleMatrix->nonZeros = nonZeros;
+    return yaleMatrix;
+}
+
+/**
+ * Prints matrix
+ * matrix matrix
+ * m Number of rows of matrix
+ * n Number of columns of matrix
+ */
+void printMatrix(int **matrix, int m, int n) {
     int i;
     int j;
     for ( i = 0 ; i < m ; i++ ) {
         for ( j = 0; j < n; j++ ) {
-            printf("%d ", pArray[i][j]);
+            printf("%d ", matrix[i][j]);
         }
         printf("\n");
     }
     printf("\n");
 }
 
+/**
+ * prints YSMF
+ *
+ */
+void printYaleMatrix(YSMF *matrix) {
+    int i;
+    
+    printf("A : ");
+    for (i = 0; i < matrix->nonZeros; i++) {
+        printf("%d ", matrix->a[i]);
+    }
+    printf("\n");
+    
+    printf("Ai: ");
+    for (i = 0; i < matrix->m + 1; i++) {
+        printf("%d ", matrix->ai[i]);
+    }
+    printf("\n");
+    
+    printf("Aj: ");
+    for (i = 0; i < matrix->nonZeros; i++) {
+        printf("%d ", matrix->aj[i]);
+    }
+}
+
+/**
+ * initializes a mxn sparse matrix with perc non zero values
+ * m Rows of matrix
+ * n Columns of matrix
+ * perc percantage of non zero elements in Matrix
+ */
 int** initSparseMatrix(int m, int n, double perc) {
     const int nonZeroCount = m * n * perc;
     int **a = (int**)malloc(m * sizeof(int *));
@@ -43,8 +140,6 @@ int** initSparseMatrix(int m, int n, double perc) {
     }
     
     //set nonZeroCount x random value into random place in matrices
-    srand(time(NULL));
-    printf("nonZeroCount %d\n", nonZeroCount);
     for (i = 0; i < nonZeroCount; i++) {
         int randM, randN;
         do {
@@ -55,6 +150,30 @@ int** initSparseMatrix(int m, int n, double perc) {
         a[randM][randN] = rand() % 9 + 1;
     }
     return a;
+}
+
+/**
+ * Converts a YSMF into a simple Matrix format
+ */
+int** convertFromYale(YSMF *yaleMatrix) {
+    int i, j, indexAJ = 0, indexA = 0;
+    int **matrix = (int**)malloc(yaleMatrix->m * sizeof(int*));
+    
+    for ( i = 0; i < yaleMatrix->m; i++ ) {
+        matrix[i] = (int*) calloc(yaleMatrix->n * sizeof(int), sizeof(int));
+    }
+    
+    //iterate over Ai[]
+    for (i = 1; i < yaleMatrix->m + 1; i++) {
+        //How Many nonZeros in row i ?
+        int nonZeros = yaleMatrix->ai[i] - yaleMatrix->ai[i -1];
+        
+        for ( j = 0; j < nonZeros; j++ ) {
+            matrix[i -1][yaleMatrix->aj[indexAJ++]] = yaleMatrix->a[indexA++];
+        }
+    }
+    
+    return matrix;
 }
 
 int main( int argc, const char* argv[] ) {
@@ -88,42 +207,20 @@ int main( int argc, const char* argv[] ) {
     }//Validation
     
     //Init Sparse Matrices
+    srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
-    printMatrix(a, m, n);
-    YSMF ya;
-    ya.m = m;
-    ya.n = n;
-    //storage has to be reallocated in case of unknown matrices
-    ya.nonZeros = m * n * perc;
-    //create YSMF
-    ya.a = malloc(ya.nonZeros * sizeof(int));
-    ya.ai = malloc((ya.m + 1) * sizeof(int));
-    ya.aj = malloc(ya.n * sizeof(int));
+    //printMatrix(a, m, n);
+    //printMatrix(b, m, n);
+    //printf("\n");
+
+    //Create YSMF
+    YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
+    YSMF *yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
+    //printYaleMatrix(yaleMatrixA);
+    //int **matrix = convertFromYale(yaleMatrixA);
+    //printf("\n");
+    //printMatrix(matrix, m, n);
     
-    int i,j;
-    int indexA = 0;
-    int indexAI = 0;
-    int indexAJ = 0;
-    
-    for ( i = 0; i < m; i++ ) {
-        for (j = 0; j < n; j++) {
-            if ( a[i][j] != 0 ) {
-                ya.a[indexA++] = a[i][j];
-                ya.aj[indexAJ++] = j;
-            }
-        }
-    }
-    
-    //print oneD- Array
-    for (i = 0; i < ya.nonZeros; i++) {
-        printf("%d ", ya.a[i]);
-    }
     return 0;
 }
-
-
-
-
-
-

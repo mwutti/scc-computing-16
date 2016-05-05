@@ -176,6 +176,23 @@ int** convertFromYale(YSMF *yaleMatrix) {
     return matrix;
 }
 
+int** addSimple(int **a, int **b, int m, int n) {
+    int **c = (int**)malloc(m * sizeof(int *));
+    
+    int i,j;
+    for ( i = 0 ; i < m; i++ ) {
+        c[i] =(int *) malloc(n * sizeof(int));
+    }
+    
+    for ( i = 0; i < m; i++ ) {
+        for ( j = 0; j < n; j++ ) {
+            c[i][j] = a[i][j] + b[i][j];
+        }
+    }
+
+    return c;
+}
+
 int main( int argc, const char* argv[] ) {
     //arg[0], arg[1] -> m x n
     //arg[2] perc. of non 0 values
@@ -210,10 +227,10 @@ int main( int argc, const char* argv[] ) {
     srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
-    //printMatrix(a, m, n);
-    //printMatrix(b, m, n);
-    //printf("\n");
-
+    printMatrix(a, m, n);
+    printMatrix(b, m, n);
+    printf("\n");
+    
     //Create YSMF
     YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     YSMF *yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
@@ -222,5 +239,11 @@ int main( int argc, const char* argv[] ) {
     //printf("\n");
     //printMatrix(matrix, m, n);
     
+    //ADD matrices simple
+    int **c = addSimple(a, b, m, n);
+    
+    printMatrix(c, m, n);
+    
     return 0;
 }
+

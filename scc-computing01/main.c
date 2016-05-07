@@ -303,6 +303,8 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
                 nonZerosForRow++;
             }
                 yaleMatrix->nonZeros+= nonZerosForRow;
+            free(tempA);
+            free(tempB);
         }
     }
 

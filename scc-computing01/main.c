@@ -309,9 +309,9 @@ int main( int argc, const char* argv[] ) {
     srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
-    printMatrix(a, m, n);
+    //printMatrix(a, m, n);
     //printMatrix(b, m, n);
-    printf("\n");
+    //printf("\n");
     
     //Create YSMF
     YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
@@ -320,21 +320,19 @@ int main( int argc, const char* argv[] ) {
     //printf("\n");
     //printYaleMatrix(yaleMatrixB);
     //int **matrix = convertFromYale(yaleMatrixA);
-    printf("\n");
+    //printf("\n");
     //printMatrix(matrix, m, n);
     
     //ADD matrices simple
     int **c = addSimple(a, b, m, n);
-    printMatrix(c, m, n);
+    //printMatrix(c, m, n);
     //add matrices in YSMF
     YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
-    
-
-    printYaleMatrix(yaleMatrixC);
-    printf("\n");
+    //printYaleMatrix(yaleMatrixC);
+    //printf("\n");
     //convert back to simple format
     int **cFromYale = convertFromYale(yaleMatrixC);
-    printMatrix(cFromYale, m, n);
+    //printMatrix(cFromYale, m, n);
     
     //thus c from simple addition and cFromYale (Addition) must have same values
     for ( i = 0; i < m; i++ ) {
@@ -345,7 +343,7 @@ int main( int argc, const char* argv[] ) {
             }
         }
     }
-
+    printf("Success\n");
     return 0;
 }
 

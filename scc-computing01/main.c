@@ -194,127 +194,124 @@ int** addSimple(int **a, int **b, int m, int n) {
 }
 
 YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
-    YSMF *yaleMatrix = (YSMF *)malloc(sizeof(YSMF));
-    int i, j;
-    if ( yaleMatrix == NULL ) {
+    YSMF *yaleMatrixC = (YSMF *)malloc(sizeof(YSMF));
+    int i;
+    if ( yaleMatrixC == NULL ) {
         return NULL;
     }
     
-    yaleMatrix->aj = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros)* sizeof(int));
-    yaleMatrix->ai = (int *)malloc((yaleMatrixA->m+1) * sizeof(int));
-    yaleMatrix->a = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
+//    yaleMatrixC->aj = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
+        yaleMatrixC->aj = (int *)malloc(16 * sizeof(int));
+    yaleMatrixC->ai = (int *)malloc((yaleMatrixA->m+1) * sizeof(int));
+//    yaleMatrixC->a = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
+        yaleMatrixC->a = (int *)malloc(16 * sizeof(int));
     
-    yaleMatrix->m = yaleMatrixA->m;
-    yaleMatrix->n = yaleMatrixA->n;
+    yaleMatrixC->m = yaleMatrixA->m;
+    yaleMatrixC->n = yaleMatrixA->n;
     
-    if ( yaleMatrix->a == NULL ) {
-        free(yaleMatrix);
+    if ( yaleMatrixC->a == NULL ) {
+        free(yaleMatrixC);
         return NULL;
     }
     
-    if ( yaleMatrix->aj == NULL ) {
-        free(yaleMatrix->a);
-        free(yaleMatrix);
+    if ( yaleMatrixC->aj == NULL ) {
+        free(yaleMatrixC->a);
+        free(yaleMatrixC);
         return NULL;
     }
     
-    if ( yaleMatrix->ai == NULL ) {
-        free(yaleMatrix->a);
-        free(yaleMatrix->aj);
-        free(yaleMatrix);
+    if ( yaleMatrixC->ai == NULL ) {
+        free(yaleMatrixC->a);
+        free(yaleMatrixC->aj);
+        free(yaleMatrixC);
         return NULL;
     }
     
-    int indexA = 0, indexAI = 1, indexAJ = 0;
-    int indexAA = 0, indexAIA = 1, indexAJA = 0;
-    int indexAB = 0, indexAIB = 1, indexAJB = 0;
     int globalNonZeros = 0;
+    int aiA= 1, aiB = 1, aiC = 1;      //index for rowArrays
+    int ajA= 0, ajB = 0, ajC = 0;   //index for columnArrays
     
-    yaleMatrix->ai[0] = 0;
-    for ( i = 1; i < yaleMatrixA->m +1; i++ ) {
-        int nonZerosA = yaleMatrixA->ai[i] - yaleMatrixA->ai[i-1];
-        int nonZerosB = yaleMatrixB->ai[i] - yaleMatrixB->ai[i-1];
-        
-        // Both rows of A & B are 0
-        if ( nonZerosA == 0 && nonZerosB == 0 ) {
-            yaleMatrix->a[i] = yaleMatrix->a[i-1];
-        } else if ( nonZerosA == 0 && nonZerosB != 0 ) {
-            // Rows of Matrix A are 0
-            for ( j = 0; j < nonZerosB; j++ ) {
-                yaleMatrix->a[indexA++] = yaleMatrixB->a[indexAB++];
-                yaleMatrix->aj[indexAJ++] = yaleMatrixB->aj[indexAJB++];
+    yaleMatrixC->ai[0] = 0;
+    for ( i = 1; i < yaleMatrixA->m + 1; i++ ) {
+        if ( yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1] == 0 &&    // case both rows have no 0 Values
+            yaleMatrixB->ai[aiB] - yaleMatrixB->ai[aiB - 1] == 0 ) {
+            yaleMatrixC->ai[aiC] = yaleMatrixC->ai[aiC - 1];
+            aiA++;
+            aiB++;
+            aiC++;
+        } else if ( yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1] == 0) { // in Matrix B there is at least 1 nonZero value
+            int nonZeros = yaleMatrixB->ai[aiB] - yaleMatrixB->ai[aiB - 1]; // how many nonZeros in this row?
+            yaleMatrixC->ai[aiC] = yaleMatrixC->ai[aiC - 1] + nonZeros;     // number of non Zeros for this row
+            aiA++;
+            aiB++;
+            aiC++;
+            while ( nonZeros >= 0 ) {                                      // for all nonZeros in this row
+                yaleMatrixC->aj[ajC] = yaleMatrixB->aj[ajB];
+                yaleMatrixC->a[ajC++] = yaleMatrixB->a[ajB++];
+                nonZeros--;
             }
-            yaleMatrix->ai[indexAI] = yaleMatrix->ai[indexAI-1] + nonZerosB;
-            yaleMatrix->nonZeros+= nonZerosB;
-        } else if ( nonZerosA != 0 && nonZerosB == 0 ) {
-            //Rows of Matrix B are 0
-            for ( j = 0; j < nonZerosA; j++ ) {
-                yaleMatrix->a[indexA++] = yaleMatrixA->a[indexAA++];
-                yaleMatrix->aj[indexAJ++] = yaleMatrixA->aj[indexAJA++];
+            globalNonZeros += nonZeros;
+        } else if ( yaleMatrixB->ai[aiB] - yaleMatrixA->ai[aiB - 1] == 0) { // in Matrix A there is at leas 1 nonZero value
+            int nonZeros = yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1];
+            yaleMatrixC->ai[aiC] = yaleMatrixC->ai[aiC - 1] + nonZeros;     // number of non Zeros for this row
+            aiA++;
+            aiB++;
+            aiC++;
+            while ( nonZeros > 0 ) {                                      // for all nonZeros in this row
+                yaleMatrixC->aj[ajC] = yaleMatrixA->aj[ajA];
+                yaleMatrixC->a[ajC++] = yaleMatrixA->a[ajA++];
+                nonZeros--;
             }
-            yaleMatrix->ai[indexAI] = yaleMatrix->ai[indexAI-1] + nonZerosA;
-            yaleMatrix->nonZeros+= nonZerosA;
-        } else {
-            // Rows of A & B are not 0
-            int *tempA = malloc(nonZerosA * sizeof(int)); //temp arrays holding the column index of row i
-            int *tempB = malloc(nonZerosB * sizeof(int));
-
-            
-            for ( j=0 ; j < nonZerosA; j++ ) {
-                tempA[j] = yaleMatrixA->aj[indexAJA + j];
-            }
-            
-            for ( j=0 ; j < nonZerosB; j++ ) {
-                tempB[j] = yaleMatrixB->aj[indexAJB + j];
-            }
-            
-            int iA = 0; int iB = 0, nonZerosForRow = 0;
-            
-            for ( j = 0; j < nonZerosA; j++ ) {     // iterate over tempA
-                if ( iA + 1 < nonZerosA ) {         // within bounds of tempA
-                    if ( iB + 1 < nonZerosB ) {     // within bounds of tempB
-                        if ( tempA[iA] < tempB[iB] ) {
-                            yaleMatrix->a[indexA++] = yaleMatrixA->a[indexAA++];
-                            yaleMatrix->aj[indexAJ++] = tempA[iA++];
-                        } else if ( tempB[iB] < tempA[iA] ) {
-                            yaleMatrix->a[indexA++] = yaleMatrixB->a[indexAB++];
-                            yaleMatrix->aj[indexAJ++] = tempB[iB++];
-                        } else {                    //Addition of tempA + tempB
-                            yaleMatrix->a[indexA++] = yaleMatrixA->a[indexAA++] + yaleMatrixB->a[indexAB++];
-                            yaleMatrix->aj[indexAJ++] = tempA[iA++];
-                            iB++;
-                        }
-                    } else {                        // no more values in tempB -> just add values of A
-                        yaleMatrix->a[indexA++] = yaleMatrixA->a[indexAA++];
-                        yaleMatrix->aj[indexAJ++] = tempA[iA++];
-                    }
-                } else {                            // no more values in tempA -> just add values of B
-                    yaleMatrix->a[indexA++] = yaleMatrixB->a[indexAB++];
-                    yaleMatrix->aj[indexAJ++] = tempB[iB++];
+            globalNonZeros += nonZeros;
+        } else {        // Potential values to add
+            int nonZerosA = yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1];
+            int nonZerosB = yaleMatrixB->ai[aiB] - yaleMatrixB->ai[aiB - 1];
+            int nonZerosForRow = 0;
+            while ( nonZerosA > 0 && nonZerosB > 0 ) {    // Start iterating over nonZeros
+                if ( yaleMatrixA->aj[ajA] == yaleMatrixB->aj[ajB] ) { // addition of values
+                    yaleMatrixC->a[ajC] = yaleMatrixA->a[ajA++] + yaleMatrixB->a[ajB];
+                    yaleMatrixC->aj[ajC++] = yaleMatrixB->aj[ajB++];
+                    nonZerosForRow++;
+                    nonZerosA--;
+                    nonZerosB--;
+                } else if ( yaleMatrixA->aj[ajA] < yaleMatrixB->aj[ajB] ) { // first add smaller value in Matrix A
+                    yaleMatrixC->aj[ajC] = yaleMatrixA->aj[ajA];
+                    yaleMatrixC->a[ajC++] = yaleMatrixA->a[ajA++];
+                    nonZerosForRow++;
+                    nonZerosA--;
+                } else  { // first add smaller value in Matrix B
+                    yaleMatrixC->aj[ajC] = yaleMatrixB->aj[ajB];
+                    yaleMatrixC->a[ajC++] = yaleMatrixB->a[ajB++];
+                    nonZerosForRow++;
+                    nonZerosB--;
                 }
-                nonZerosForRow++;
             }
-            //remaining tempB's
-            if ( iB + 1 < nonZerosB ) {
-                for ( j = iB ; j < nonZerosB; j++ ) {
-                    yaleMatrix->a[indexA++] = yaleMatrixB->a[indexAB++];
-                    yaleMatrix->aj[indexAJ++] = tempB[iB++];
-                }
+            
+            while ( nonZerosA > 0 ) { //add remaining values from A
+                yaleMatrixC->aj[ajC] = yaleMatrixA->aj[ajA];
+                yaleMatrixC->a[ajC++] = yaleMatrixA->a[ajA++];
                 nonZerosForRow++;
+                nonZerosA--;
             }
-                yaleMatrix->nonZeros+= nonZerosForRow;
-            free(tempA);
-            free(tempB);
+            
+            while ( nonZerosB > 0 ) { //add remaining values from B
+                yaleMatrixC->aj[ajC] = yaleMatrixB->aj[ajB];
+                yaleMatrixC->a[ajC++] = yaleMatrixB->a[ajB++];
+                nonZerosForRow++;
+                nonZerosB--;
+            }
+            globalNonZeros += nonZerosForRow;
+            yaleMatrixC->ai[aiC] = yaleMatrixC->ai[aiC - 1] + nonZerosForRow;     // number of non Zeros for this row
+            aiA++;
+            aiB++;
+            aiC++;
         }
     }
-
+    yaleMatrixC->nonZeros = globalNonZeros;
+    realloc(yaleMatrixC->a, globalNonZeros * sizeof(int));
+    realloc(yaleMatrixC->aj, globalNonZeros * sizeof(int));
     
-    
-    
-    realloc(yaleMatrix->a, globalNonZeros * sizeof(int));
-    realloc(yaleMatrix->aj, globalNonZeros * sizeof(int));
-    
-    return yaleMatrix;
+    return yaleMatrixC;
 }
 
 int main( int argc, const char* argv[] ) {
@@ -351,27 +348,30 @@ int main( int argc, const char* argv[] ) {
     srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
-    //printMatrix(a, m, n);
-    //printMatrix(b, m, n);
+    printMatrix(a, m, n);
+    printMatrix(b, m, n);
     //printf("\n");
+    
+    //ADD matrices simple
+    int **c = addSimple(a, b, m, n);
+    printMatrix(c, m, n);
     
     //Create YSMF
     YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     YSMF *yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
-    //printYaleMatrix(yaleMatrixA);
-    //printf("\n");
-    //printYaleMatrix(yaleMatrixB);
+    printYaleMatrix(yaleMatrixA);
+    printf("\n");
+    printf("\n");
+    printYaleMatrix(yaleMatrixB);
     //int **matrix = convertFromYale(yaleMatrixA);
-    //printf("\n");
+    printf("\n");
+    printf("\n");
     //printMatrix(matrix, m, n);
     
-    //ADD matrices simple
-    int **c = addSimple(a, b, m, n);
-    //printMatrix(c, m, n);
     //add matrices in YSMF
     YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
-    //printYaleMatrix(yaleMatrixC);
-    //printf("\n");
+    printYaleMatrix(yaleMatrixC);
+    printf("\n");
     //convert back to simple format
     int **cFromYale = convertFromYale(yaleMatrixC);
     //printMatrix(cFromYale, m, n);

@@ -200,11 +200,9 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
         return NULL;
     }
     
-//    yaleMatrixC->aj = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
-        yaleMatrixC->aj = (int *)malloc(16 * sizeof(int));
+    yaleMatrixC->aj = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
     yaleMatrixC->ai = (int *)malloc((yaleMatrixA->m+1) * sizeof(int));
-//    yaleMatrixC->a = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
-        yaleMatrixC->a = (int *)malloc(16 * sizeof(int));
+    yaleMatrixC->a = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
     
     yaleMatrixC->m = yaleMatrixA->m;
     yaleMatrixC->n = yaleMatrixA->n;
@@ -245,13 +243,13 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
             aiA++;
             aiB++;
             aiC++;
-            while ( nonZeros >= 0 ) {                                      // for all nonZeros in this row
+            while ( nonZeros > 0 ) {                                      // for all nonZeros in this row
                 yaleMatrixC->aj[ajC] = yaleMatrixB->aj[ajB];
                 yaleMatrixC->a[ajC++] = yaleMatrixB->a[ajB++];
                 nonZeros--;
+                globalNonZeros++;
             }
-            globalNonZeros += nonZeros;
-        } else if ( yaleMatrixB->ai[aiB] - yaleMatrixA->ai[aiB - 1] == 0) { // in Matrix A there is at leas 1 nonZero value
+        } else if ( yaleMatrixB->ai[aiB] - yaleMatrixA->ai[aiB - 1] == 0) { // in Matrix A there is at least 1 nonZero value
             int nonZeros = yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1];
             yaleMatrixC->ai[aiC] = yaleMatrixC->ai[aiC - 1] + nonZeros;     // number of non Zeros for this row
             aiA++;
@@ -261,8 +259,8 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
                 yaleMatrixC->aj[ajC] = yaleMatrixA->aj[ajA];
                 yaleMatrixC->a[ajC++] = yaleMatrixA->a[ajA++];
                 nonZeros--;
+                globalNonZeros++;
             }
-            globalNonZeros += nonZeros;
         } else {        // Potential values to add
             int nonZerosA = yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1];
             int nonZerosB = yaleMatrixB->ai[aiB] - yaleMatrixB->ai[aiB - 1];
@@ -380,12 +378,12 @@ int main( int argc, const char* argv[] ) {
     for ( i = 0; i < m; i++ ) {
         for ( j = 0; j < n; j++ ) {
             if ( c[i][j] != cFromYale[i][j] ) {
-                printf("Something went wrong :-(\n");
-                break;
+                printf("Something went wrong :-(  i: %d j:%d\n", i, j);
             }
         }
     }
-    printf("Success\n");
+    
+    //Debugging ...
     return 0;
 }
 

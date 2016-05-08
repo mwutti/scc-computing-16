@@ -358,61 +358,75 @@ int main( int argc, const char* argv[] ) {
     //Create YSMF
     YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     YSMF *yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
+    free(a);
+    free(b);
     //printYaleMatrix(yaleMatrixA);
     //printf("\n");
     //printf("\n");
     //printYaleMatrix(yaleMatrixB);
-    //int **matrix = convertFromYale(yaleMatrixA);
+    int **matrix = convertFromYale(yaleMatrixA);
     //printf("\n");
     //printf("\n");
     //printMatrix(matrix, m, n);
     
     //add matrices in YSMF
-    //YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+    YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+    free(yaleMatrixA);
+    free(yaleMatrixB);
     //printYaleMatrix(yaleMatrixC);
     printf("\n");
     //convert back to simple format
-    //int **cFromYale = convertFromYale(yaleMatrixC);
+    int **cFromYale = convertFromYale(yaleMatrixC);
     //printMatrix(cFromYale, m, n);
     
     //thus c from simple addition and cFromYale (Addition) must have same values
-    
-    //Debugging ...
-    int **test1 = (int **)malloc(4 * sizeof(int *));
-    test1[0] = calloc(sizeof(int), 4 *sizeof(int));
-    test1[1] = calloc(sizeof(int), 4 *sizeof(int));
-    test1[2] = calloc(sizeof(int), 4 *sizeof(int));
-    test1[3] = calloc(sizeof(int), 4 *sizeof(int));
-    test1[0][0] = 1;
-    test1[1][1] = 7;
-    test1[2][2] = 7;
-    printMatrix(test1, m, n);
-    
-    int **test2 = (int **)malloc(4 * sizeof(int *));
-    test2[0] = calloc(sizeof(int), 4 *sizeof(int));
-    test2[1] = calloc(sizeof(int), 4 *sizeof(int));
-    test2[2] = calloc(sizeof(int), 4 *sizeof(int));
-    test2[3] = calloc(sizeof(int), 4 *sizeof(int));
-    test2[0][3] = 4;
-    test2[2][0] = 1;
-    test2[3][0] = 7;
-    printMatrix(test2, m, n);
-    
-    YSMF *yaletest1 = initYaleMatrix(test1, m, n, m*n*perc);
-    YSMF *yaletest2 = initYaleMatrix(test2, m, n, m*n*perc);
-    YSMF *yaleTest3 = addYSMF(yaletest1, yaletest2);
-    int **ctest = addSimple(test1, test2, m, n);
-    printMatrix(ctest, m, n);
-    printYaleMatrix(yaleTest3);
-    int **test4 = convertFromYale(yaleTest3);
-    
     for ( i = 0; i < m; i++ ) {
-        for ( j = 0; j < n; j++ ) {
-            if ( ctest[i][j] != test4[i][j] ) {
-                printf("Something went wrong :-(  i: %d j:%d\n", i, j);
-            }
-        }
+      for ( j = 0; j < n; j++ ) {
+        if ( cFromYale[i][j] != c[i][j] ) {
+          printf("Something went wrong :-(  i: %d j:%d\n", i, j);
     }
+    }
+    }
+    printf("Success\n");
+    
+    //Debugging ... ignore
+    //int **test1 = (int **)malloc(4 * sizeof(int *));
+//    test1[0] = calloc(sizeof(int), 4 *sizeof(int));
+//    test1[1] = calloc(sizeof(int), 4 *sizeof(int));
+//    test1[2] = calloc(sizeof(int), 4 *sizeof(int));
+//    test1[3] = calloc(sizeof(int), 4 *sizeof(int));
+//    test1[0][0] = 1;
+//    test1[1][1] = 7;
+//    test1[2][2] = 7;
+    //printMatrix(test1, m, n);
+    
+//    int **test2 = (int **)malloc(4 * sizeof(int *));
+//    test2[0] = calloc(sizeof(int), 4 *sizeof(int));
+//    test2[1] = calloc(sizeof(int), 4 *sizeof(int));
+//    test2[2] = calloc(sizeof(int), 4 *sizeof(int));
+//    test2[3] = calloc(sizeof(int), 4 *sizeof(int));
+//    test2[0][3] = 4;
+//    test2[2][0] = 1;
+//    test2[3][0] = 7;
+    //printMatrix(test2, m, n);
+    
+    //YSMF *yaletest1 = initYaleMatrix(test1, m, n, m*n*perc);
+    //YSMF *yaletest2 = initYaleMatrix(test2, m, n, m*n*perc);
+    //YSMF *yaleTest3 = addYSMF(yaletest1, yaletest2);
+    //int **ctest = addSimple(test1, test2, m, n);
+    //printMatrix(ctest, m, n);
+    //printYaleMatrix(yaleTest3);
+    //int **test4 = convertFromYale(yaleTest3);
+    
+    //for ( i = 0; i < m; i++ ) {
+      //  for ( j = 0; j < n; j++ ) {
+        //    if ( ctest[i][j] != test4[i][j] ) {
+          //      printf("Something went wrong :-(  i: %d j:%d\n", i, j);
+            //}
+        //}
+    //}
+    
+    
 
     return 0;
     

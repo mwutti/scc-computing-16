@@ -122,6 +122,7 @@ void printYaleMatrix(YSMF *matrix) {
     for (i = 0; i < matrix->nonZeros; i++) {
         printf("%d ", matrix->aj[i]);
     }
+    printf("\n\n");
 }
 
 /**
@@ -249,7 +250,7 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
                 nonZeros--;
                 globalNonZeros++;
             }
-        } else if ( yaleMatrixB->ai[aiB] - yaleMatrixA->ai[aiB - 1] == 0) { // in Matrix A there is at least 1 nonZero value
+        } else if ( yaleMatrixB->ai[aiB] - yaleMatrixB->ai[aiB - 1] == 0) { // in Matrix A there is at least 1 nonZero value
             int nonZeros = yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1];
             yaleMatrixC->ai[aiC] = yaleMatrixC->ai[aiC - 1] + nonZeros;     // number of non Zeros for this row
             aiA++;
@@ -346,44 +347,74 @@ int main( int argc, const char* argv[] ) {
     srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
-    printMatrix(a, m, n);
-    printMatrix(b, m, n);
+    //printMatrix(a, m, n);
+    //printMatrix(b, m, n);
     //printf("\n");
     
     //ADD matrices simple
     int **c = addSimple(a, b, m, n);
-    printMatrix(c, m, n);
+    //printMatrix(c, m, n);
     
     //Create YSMF
     YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     YSMF *yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
-    printYaleMatrix(yaleMatrixA);
-    printf("\n");
-    printf("\n");
-    printYaleMatrix(yaleMatrixB);
+    //printYaleMatrix(yaleMatrixA);
+    //printf("\n");
+    //printf("\n");
+    //printYaleMatrix(yaleMatrixB);
     //int **matrix = convertFromYale(yaleMatrixA);
-    printf("\n");
-    printf("\n");
+    //printf("\n");
+    //printf("\n");
     //printMatrix(matrix, m, n);
     
     //add matrices in YSMF
-    YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
-    printYaleMatrix(yaleMatrixC);
+    //YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+    //printYaleMatrix(yaleMatrixC);
     printf("\n");
     //convert back to simple format
-    int **cFromYale = convertFromYale(yaleMatrixC);
+    //int **cFromYale = convertFromYale(yaleMatrixC);
     //printMatrix(cFromYale, m, n);
     
     //thus c from simple addition and cFromYale (Addition) must have same values
+    
+    //Debugging ...
+    int **test1 = (int **)malloc(4 * sizeof(int *));
+    test1[0] = calloc(sizeof(int), 4 *sizeof(int));
+    test1[1] = calloc(sizeof(int), 4 *sizeof(int));
+    test1[2] = calloc(sizeof(int), 4 *sizeof(int));
+    test1[3] = calloc(sizeof(int), 4 *sizeof(int));
+    test1[0][0] = 1;
+    test1[1][1] = 7;
+    test1[2][2] = 7;
+    printMatrix(test1, m, n);
+    
+    int **test2 = (int **)malloc(4 * sizeof(int *));
+    test2[0] = calloc(sizeof(int), 4 *sizeof(int));
+    test2[1] = calloc(sizeof(int), 4 *sizeof(int));
+    test2[2] = calloc(sizeof(int), 4 *sizeof(int));
+    test2[3] = calloc(sizeof(int), 4 *sizeof(int));
+    test2[0][3] = 4;
+    test2[2][0] = 1;
+    test2[3][0] = 7;
+    printMatrix(test2, m, n);
+    
+    YSMF *yaletest1 = initYaleMatrix(test1, m, n, m*n*perc);
+    YSMF *yaletest2 = initYaleMatrix(test2, m, n, m*n*perc);
+    YSMF *yaleTest3 = addYSMF(yaletest1, yaletest2);
+    int **ctest = addSimple(test1, test2, m, n);
+    printMatrix(ctest, m, n);
+    printYaleMatrix(yaleTest3);
+    int **test4 = convertFromYale(yaleTest3);
+    
     for ( i = 0; i < m; i++ ) {
         for ( j = 0; j < n; j++ ) {
-            if ( c[i][j] != cFromYale[i][j] ) {
+            if ( ctest[i][j] != test4[i][j] ) {
                 printf("Something went wrong :-(  i: %d j:%d\n", i, j);
             }
         }
     }
-    
-    //Debugging ...
+
     return 0;
+    
 }
 

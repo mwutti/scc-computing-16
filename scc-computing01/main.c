@@ -17,8 +17,11 @@ int m;
 int n;
 double perc;
 
+int numThreads;
+pthread_t * threads;
+pthread_mutex_t mu;
+
 typedef struct YSMF {
-    int nonZeros;
     int *a;
     int *ai;
     int *aj;
@@ -28,12 +31,6 @@ typedef struct INIT_STRUCT {
     int row;
     int **matrix;
 } INIT_STRUCT;
-
-int numThreads;
-
-
-pthread_t * threads;
-pthread_mutex_t mu;
 
 /**
  * Creates a YSMF from given matrix a
@@ -88,7 +85,6 @@ YSMF *initYaleMatrix(int** matrix, int m, int n, int nonZeros) {
         yaleMatrix->ai[indexAI] = yaleMatrix->ai[indexAI-1] + nonZeroCount;
         indexAI++;
     }
-    yaleMatrix->nonZeros = nonZeros;
     return yaleMatrix;
 }
 
@@ -118,7 +114,7 @@ void printYaleMatrix(YSMF *matrix) {
     int i;
     
     printf("A : ");
-    for (i = 0; i < matrix->nonZeros; i++) {
+    for (i = 0; i < matrix->ai[m]; i++) {
         printf("%d ", matrix->a[i]);
     }
     printf("\n");
@@ -130,7 +126,7 @@ void printYaleMatrix(YSMF *matrix) {
     printf("\n");
     
     printf("Aj: ");
-    for (i = 0; i < matrix->nonZeros; i++) {
+    for (i = 0; i < matrix->ai[m]; i++) {
         printf("%d ", matrix->aj[i]);
     }
     printf("\n\n");
@@ -259,9 +255,10 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
         return NULL;
     }
     
-    yaleMatrixC->aj = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
+    // optimistic allocation of a and ai with nonZerosA +nonZerosB ... reallocated when finished
+    yaleMatrixC->aj = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
     yaleMatrixC->ai = (int *)malloc((m + 1) * sizeof(int));
-    yaleMatrixC->a = (int *)malloc((yaleMatrixA->nonZeros + yaleMatrixB->nonZeros) * sizeof(int));
+    yaleMatrixC->a = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
     
     if ( yaleMatrixC->a == NULL ) {
         free(yaleMatrixC);
@@ -361,7 +358,6 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
             aiC++;
         }
     }
-    yaleMatrixC->nonZeros = globalNonZeros;
     realloc(yaleMatrixC->a, globalNonZeros * sizeof(int));
     realloc(yaleMatrixC->aj, globalNonZeros * sizeof(int));
     
@@ -427,11 +423,11 @@ int main( int argc, const char* argv[] ) {
     
     //add matrices in YSMF
     YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+    printYaleMatrix(yaleMatrixC);
     free(yaleMatrixA);
     free(yaleMatrixB);
     free(threads);
     //printYaleMatrix(yaleMatrixC);
-    printf("\n");
     //convert back to simple format
     int **cFromYale = convertFromYale(yaleMatrixC);
     //printMatrix(cFromYale, m, n);

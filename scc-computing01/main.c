@@ -579,36 +579,18 @@ int main( int argc, const char* argv[] ) {
     int **b = initSparseMatrix(m, n, perc);
     yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
     free(b);
-    //printMatrix(a, m, n);
-    //printMatrix(b, m, n);
-    //printf("\n");
-    
-    //ADD matrices simple
-    //int **c = addSimple(a, b, m, n);
-    //printMatrix(c, m, n);
-    
-    
-    
-    //printYaleMatrix(yaleMatrixA);
-    //printf("\n");
-    //printf("\n");
-    //printYaleMatrix(yaleMatrixB);
-    //int **matrix = convertFromYale(yaleMatrixA);
-    //printf("\n");
-    //printf("\n");
-    //printMatrix(matrix, m, n);
-    
-    //add matrices in YSMF
-    //yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
     
     struct timeval  tv;
     gettimeofday(&tv, NULL);
     double start_mill =
     (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000 ;
-    
-    //yaleMatrixC = addYSMFParallel(yaleMatrixA, yaleMatrixB);
-    yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
-    //printYaleMatrix(yaleMatrixC);
+    if ( numThreads == 1 ) {
+        yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+    } else {
+        numThreads++;
+        yaleMatrixC = addYSMFParallel(yaleMatrixA, yaleMatrixB);
+    }
+
     gettimeofday(&tv, NULL);
     double end_mill =
     (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000 ;
@@ -617,22 +599,6 @@ int main( int argc, const char* argv[] ) {
     free(yaleMatrixA);
     free(yaleMatrixB);
     free(threads);
-    //printYaleMatrix(yaleMatrixC);
-    //convert back to simple format
-    int **cFromYale = convertFromYale(yaleMatrixC);
-    //printMatrix(cFromYale, m, n);
-    
-    //thus c from simple addition and cFromYale (Addition) must have same values
-    //for ( i = 0; i < m; i++ ) {
-      //for ( j = 0; j < n; j++ ) {
-        //if ( cFromYale[i][j] != c[i][j] ) {
-          //printf("Something went wrong :-(  i: %d j:%d\n", i, j);
-        //}
-      //}
-    //}
-
-
     return 0;
-    
 }
 

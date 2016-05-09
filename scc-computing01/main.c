@@ -509,7 +509,6 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
     pthread_mutex_init(&mu3, NULL);
     int i;
     for ( i = 0; i < numThreads; i++ ) {
-        //TODO Check i
         YSMF_ADD *ysmfADD = malloc(sizeof(YSMF_ADD *));
         ysmfADD->row = 0;
         ysmfADD->rowInserted = -1;
@@ -560,13 +559,13 @@ int main( int argc, const char* argv[] ) {
     srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
-    printMatrix(a, m, n);
-    printMatrix(b, m, n);
-    printf("\n");
+    //printMatrix(a, m, n);
+    //printMatrix(b, m, n);
+    //printf("\n");
     
     //ADD matrices simple
     int **c = addSimple(a, b, m, n);
-    printMatrix(c, m, n);
+    //printMatrix(c, m, n);
     
     //Create YSMF
     yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
@@ -584,11 +583,22 @@ int main( int argc, const char* argv[] ) {
     
     //add matrices in YSMF
     //yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+    
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+    double start_mill =
+    (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000 ;
+    
     yaleMatrixC = addYSMFParallel(yaleMatrixA, yaleMatrixB);
+    gettimeofday(&tv, NULL);
+    double end_mill =
+    (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000 ;
+
+    printf("duration: %f", end_mill - start_mill);
     free(yaleMatrixA);
     free(yaleMatrixB);
     free(threads);
-    printYaleMatrix(yaleMatrixC);
+    //printYaleMatrix(yaleMatrixC);
     //convert back to simple format
     int **cFromYale = convertFromYale(yaleMatrixC);
     //printMatrix(cFromYale, m, n);
@@ -602,7 +612,7 @@ int main( int argc, const char* argv[] ) {
       }
     }
     printf("Success\n");
-    
+
     return 0;
     
 }

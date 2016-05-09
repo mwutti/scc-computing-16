@@ -11,6 +11,7 @@
 #include <string.h>
 #include <time.h>
 #include <limits.h>
+#include <pthread.h>
 
 typedef struct YSMF {
     int m;
@@ -20,6 +21,17 @@ typedef struct YSMF {
     int *ai;
     int *aj;
 } YSMF;
+
+typedef struct INIT_STRUCT {
+    int row;
+    int m;
+    int n;
+    int **matrix;
+} INIT_STRUCT;
+
+int numThreads;
+pthread_t * threads;
+pthread_mutex_t mu;
 
 /**
  * Creates a YSMF from given matrix a
@@ -149,7 +161,56 @@ int** initSparseMatrix(int m, int n, double perc) {
         } while (a[randM][randN] != 0);
         
         a[randM][randN] = rand() % 9 + 1;
+
     }
+    return a;
+}
+
+void *initRow(void *init_struct) {
+    INIT_STRUCT *init = (INIT_STRUCT *)init_struct;
+    while ( init->row < init->m ) {
+        pthread_mutex_lock(&mu);
+        int row = init->row++;
+        if ( row < init->m ) {
+            init->matrix[row] =(int *) calloc(init->n * sizeof(int), sizeof(int));
+        }
+        pthread_mutex_unlock(&mu);
+    }
+
+    return (NULL);
+}
+
+
+int ** initSparseMatrixParallel(int m, int n, double perc) {
+    const int nonZeroCount = m * n * perc;
+    int **a = (int**)malloc(m * sizeof(int *));
+    int i;
+    
+    INIT_STRUCT *init = (INIT_STRUCT *)malloc(sizeof(INIT_STRUCT *));
+    init->matrix = a;
+    init->m = m;
+    init->n = n;
+    init->row = 0;
+    
+    pthread_mutex_init(&mu, NULL);
+    for ( i = 0; i < numThreads ; i++ ) {
+        pthread_create(&threads[i], NULL, initRow, (void *)init);
+    }
+    
+    for ( i = 0; i < numThreads ; i++ ) {
+        pthread_join(threads[i], NULL);
+    }
+    
+    for (i = 0; i < nonZeroCount; i++) {
+        int randM, randN;
+        do {
+            randM = rand() % m;
+            randN = rand() % n;
+        } while (a[randM][randN] != 0);
+        
+        a[randM][randN] = rand() % 9 + 1;
+    }
+    
     return a;
 }
 
@@ -325,7 +386,7 @@ int main( int argc, const char* argv[] ) {
     const int m = atoi(argv[1]);
     const int n = atoi(argv[2]);
     const double perc = atof(argv[3]);
-    const int numThreads = atoi(argv[4]);
+    numThreads = atoi(argv[4]);
     int i, j;
     //Validation
     if ( perc < 0.0 || perc > 1.0 ) {
@@ -343,10 +404,11 @@ int main( int argc, const char* argv[] ) {
         return -1;
     }//Validation
     
+    threads = malloc(sizeof(pthread_t) * numThreads);
     //Init Sparse Matrices
     srand(time(NULL));
-    int **a = initSparseMatrix(m, n, perc);
-    int **b = initSparseMatrix(m, n, perc);
+    int **a = initSparseMatrixParallel(m, n, perc);
+    int **b = initSparseMatrixParallel(m, n, perc);
     //printMatrix(a, m, n);
     //printMatrix(b, m, n);
     //printf("\n");
@@ -373,6 +435,7 @@ int main( int argc, const char* argv[] ) {
     YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
     free(yaleMatrixA);
     free(yaleMatrixB);
+    free(threads);
     //printYaleMatrix(yaleMatrixC);
     printf("\n");
     //convert back to simple format

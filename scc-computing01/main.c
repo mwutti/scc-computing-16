@@ -13,24 +13,35 @@
 #include <limits.h>
 #include <pthread.h>
 
-int m;
-int n;
-double perc;
-
-int numThreads;
-pthread_t * threads;
-pthread_mutex_t mu;
-
 typedef struct YSMF {
     int *a;
     int *ai;
     int *aj;
 } YSMF;
 
+// Struct or parallel initialization of Sparse Matrices
 typedef struct INIT_STRUCT {
     int row;
     int **matrix;
 } INIT_STRUCT;
+
+typedef struct YSMF_ADD {
+    int row;
+    int rowInserted;
+} YSMF_ADD;
+
+int m;
+int n;
+double perc;
+YSMF *yaleMatrixA;
+YSMF *yaleMatrixB;
+YSMF *yaleMatrixC;
+
+int numThreads;
+pthread_t * threads;
+pthread_mutex_t mu1;
+pthread_mutex_t mu2;
+pthread_mutex_t mu3;
 
 /**
  * Creates a YSMF from given matrix a
@@ -164,12 +175,12 @@ int** initSparseMatrix(int m, int n, double perc) {
 void *initRow(void *init_struct) {
     INIT_STRUCT *init = (INIT_STRUCT *)init_struct;
     while ( init->row < m ) {
-        pthread_mutex_lock(&mu);
+        pthread_mutex_lock(&mu1);
         int row = init->row++;
         if ( row < m ) {
             init->matrix[row] =(int *) calloc(n * sizeof(int), sizeof(int));
         }
-        pthread_mutex_unlock(&mu);
+        pthread_mutex_unlock(&mu1);
     }
 
     return (NULL);
@@ -185,7 +196,7 @@ int ** initSparseMatrixParallel(int m, int n, double perc) {
     init->matrix = a;
     init->row = 0;
     
-    pthread_mutex_init(&mu, NULL);
+    pthread_mutex_init(&mu1, NULL);
     for ( i = 0; i < numThreads ; i++ ) {
         pthread_create(&threads[i], NULL, initRow, (void *)init);
     }
@@ -249,8 +260,8 @@ int** addSimple(int **a, int **b, int m, int n) {
 }
 
 YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
-    YSMF *yaleMatrixC = (YSMF *)malloc(sizeof(YSMF));
-    int i;
+    yaleMatrixC = (YSMF *)malloc(sizeof(YSMF));
+
     if ( yaleMatrixC == NULL ) {
         return NULL;
     }
@@ -278,9 +289,9 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
         return NULL;
     }
     
-    int globalNonZeros = 0;
     int aiA= 1, aiB = 1, aiC = 1;      //index for rowArrays
     int ajA= 0, ajB = 0, ajC = 0;   //index for columnArrays
+    int i;
     
     yaleMatrixC->ai[0] = 0;
     for ( i = 1; i < m + 1; i++ ) {
@@ -300,7 +311,6 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
                 yaleMatrixC->aj[ajC] = yaleMatrixB->aj[ajB];
                 yaleMatrixC->a[ajC++] = yaleMatrixB->a[ajB++];
                 nonZeros--;
-                globalNonZeros++;
             }
         } else if ( yaleMatrixB->ai[aiB] - yaleMatrixB->ai[aiB - 1] == 0) { // in Matrix A there is at least 1 nonZero value
             int nonZeros = yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1];
@@ -312,7 +322,6 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
                 yaleMatrixC->aj[ajC] = yaleMatrixA->aj[ajA];
                 yaleMatrixC->a[ajC++] = yaleMatrixA->a[ajA++];
                 nonZeros--;
-                globalNonZeros++;
             }
         } else {        // Potential values to add
             int nonZerosA = yaleMatrixA->ai[aiA] - yaleMatrixA->ai[aiA - 1];
@@ -351,15 +360,167 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
                 nonZerosForRow++;
                 nonZerosB--;
             }
-            globalNonZeros += nonZerosForRow;
             yaleMatrixC->ai[aiC] = yaleMatrixC->ai[aiC - 1] + nonZerosForRow;     // number of non Zeros for this row
             aiA++;
             aiB++;
             aiC++;
         }
     }
-    realloc(yaleMatrixC->a, globalNonZeros * sizeof(int));
-    realloc(yaleMatrixC->aj, globalNonZeros * sizeof(int));
+    realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(int));
+    realloc(yaleMatrixC->aj, yaleMatrixC->ai[m] * sizeof(int));
+    
+    return yaleMatrixC;
+}
+
+void * addRowParallel(void *ysmf_add) {
+    YSMF_ADD *ysmfADD = (YSMF_ADD *)ysmf_add;
+    int myRow;
+    int i;
+    
+    while ( ysmfADD->rowInserted < m ) {
+        //which row to add?
+        pthread_mutex_lock(&mu1);
+        myRow = ysmfADD->row++;
+        pthread_mutex_unlock(&mu1);
+        
+        if ( myRow < m ) {
+            if ( yaleMatrixA->ai[myRow + 1] - yaleMatrixA->ai[myRow] == 0 &&    // case both rows have no 0 Values
+                yaleMatrixB->ai[myRow + 1] - yaleMatrixB->ai[myRow] == 0 ) {
+                //remove busyWaiting
+                while ( ysmfADD->rowInserted != myRow - 1 ) {
+                    
+                }
+                //pthread_mutex_lock(&mu2);
+                yaleMatrixC->ai[myRow + 1] = yaleMatrixC->ai[myRow];
+                ysmfADD->rowInserted++;
+                //pthread_mutex_unlock(&mu2);
+            } else if ( yaleMatrixA->ai[myRow + 1] - yaleMatrixA->ai[myRow] == 0) { // in Matrix B there is at least 1 nonZero value
+                int nonZeros = yaleMatrixB->ai[myRow + 1] - yaleMatrixB->ai[myRow]; // how many nonZeros in this row?
+                
+                while ( ysmfADD->rowInserted != myRow - 1 ) {
+                    
+                }
+                // number of non Zeros for this row
+                yaleMatrixC->ai[myRow + 1] = yaleMatrixC->ai[myRow] + nonZeros;
+                for (i = 0; nonZeros > 0; i++) {                                      // for all nonZeros in this row
+                    yaleMatrixC->aj[yaleMatrixC->ai[myRow] + i] = yaleMatrixB->aj[yaleMatrixB->ai[myRow] +i];
+                    yaleMatrixC->a[yaleMatrixC->ai[myRow] + i] = yaleMatrixB->a[yaleMatrixB->ai[myRow] + i];
+                    nonZeros--;
+                }
+                ysmfADD->rowInserted++;
+            } else if ( yaleMatrixB->ai[myRow + 1] - yaleMatrixB->ai[myRow] == 0) { // in Matrix A there is at least 1 nonZero value
+                int nonZeros = yaleMatrixA->ai[myRow + 1] - yaleMatrixA->ai[myRow];
+                while ( ysmfADD->rowInserted != myRow - 1 ) {
+                    
+                }
+                yaleMatrixC->ai[myRow + 1] = yaleMatrixC->ai[myRow] + nonZeros;     // number of non Zeros for this row
+                
+                for (i = 0; nonZeros > 0; i++) {                                        // for all nonZeros in this row
+                    yaleMatrixC->aj[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->aj[yaleMatrixA->ai[myRow] + i];
+                    yaleMatrixC->a[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->a[yaleMatrixA->ai[myRow] + i];
+                    nonZeros--;
+                }
+                ysmfADD->rowInserted++;
+            } else {        // Potential values to add
+                int nonZerosA = yaleMatrixA->ai[myRow + 1] - yaleMatrixA->ai[myRow];
+                int nonZerosB = yaleMatrixB->ai[myRow + 1] - yaleMatrixB->ai[myRow];
+                int jA = 0, jB = 0;
+                while ( ysmfADD->rowInserted != myRow - 1 ) {
+                    
+                }
+                for (i = 0; (nonZerosA > 0 && nonZerosB > 0); i++ ) {    // Start iterating over nonZeros
+                    if ( yaleMatrixA->aj[yaleMatrixA->ai[myRow] + jA] == yaleMatrixB->aj[yaleMatrixB->ai[myRow] + jB] ) { // addition of values
+                        yaleMatrixC->a[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->a[yaleMatrixA->ai[myRow] + jA] + yaleMatrixB->a[yaleMatrixB->ai[myRow] + jB];
+                        yaleMatrixC->aj[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->aj[yaleMatrixA->ai[myRow] + jA];
+                        nonZerosA--;
+                        nonZerosB--;
+                        jB++;
+                        jA++;
+                    } else if ( yaleMatrixA->aj[yaleMatrixA->ai[myRow] + jA] < yaleMatrixB->aj[yaleMatrixB->ai[myRow] + jB] ) { // first add smaller value in Matrix A
+                        yaleMatrixC->aj[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->aj[yaleMatrixA->ai[myRow] + jA];
+                        yaleMatrixC->a[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->a[yaleMatrixA->ai[myRow] + jA];
+                        nonZerosA--;
+                        jA++;
+                    } else  { // first add smaller value in Matrix B
+                        yaleMatrixC->aj[yaleMatrixC->ai[myRow] + i] = yaleMatrixB->aj[yaleMatrixB->ai[myRow] + jB];
+                        yaleMatrixC->a[yaleMatrixC->ai[myRow] + i] = yaleMatrixB->a[yaleMatrixB->ai[myRow] + jB];
+                        nonZerosB--;
+                        jB++;
+                    }
+                }
+                
+                for (; nonZerosA > 0; i++ ) { //add remaining values from A
+                    yaleMatrixC->aj[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->aj[yaleMatrixA->ai[myRow] + jA];
+                    yaleMatrixC->a[yaleMatrixC->ai[myRow] + i] = yaleMatrixA->a[yaleMatrixA->ai[myRow] + jA];
+                    nonZerosA--;
+                    jB++;jA++;
+                }
+                
+                for (; nonZerosB > 0; i++ ) { //add remaining values from B
+                    yaleMatrixC->aj[yaleMatrixC->ai[myRow] + i] = yaleMatrixB->aj[yaleMatrixB->ai[myRow] + jB];
+                    yaleMatrixC->a[yaleMatrixC->ai[myRow] + i] = yaleMatrixB->a[yaleMatrixB->ai[myRow] + jB];
+                    nonZerosB--;
+                    jB++;
+                }
+                yaleMatrixC->ai[myRow + 1] = yaleMatrixC->ai[myRow] + i;     // number of non Zeros for this row
+                ysmfADD->rowInserted++;
+            }
+        } else {
+            return (NULL);
+        }
+    }
+    return (NULL);
+}
+
+YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
+    yaleMatrixC = (YSMF *)malloc(sizeof(YSMF));
+
+    if ( yaleMatrixC == NULL ) {
+        return NULL;
+    }
+    
+    // optimistic allocation of a and ai with nonZerosA +nonZerosB ... reallocated when finished
+    yaleMatrixC->aj = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
+    yaleMatrixC->ai = (int *)malloc((m + 1) * sizeof(int));
+    yaleMatrixC->a = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
+    
+    if ( yaleMatrixC->a == NULL ) {
+        free(yaleMatrixC);
+        return NULL;
+    }
+    
+    if ( yaleMatrixC->aj == NULL ) {
+        free(yaleMatrixC->a);
+        free(yaleMatrixC);
+        return NULL;
+    }
+    
+    if ( yaleMatrixC->ai == NULL ) {
+        free(yaleMatrixC->a);
+        free(yaleMatrixC->aj);
+        free(yaleMatrixC);
+        return NULL;
+    }
+    yaleMatrixC->ai[0] = 0;
+    //Start parallel
+    
+    pthread_mutex_init(&mu1, NULL);
+    pthread_mutex_init(&mu2, NULL);
+    pthread_mutex_init(&mu3, NULL);
+    int i;
+    for ( i = 0; i < numThreads; i++ ) {
+        //TODO Check i
+        YSMF_ADD *ysmfADD = malloc(sizeof(YSMF_ADD *));
+        ysmfADD->row = 0;
+        ysmfADD->rowInserted = -1;
+        pthread_create(&threads[i], NULL, addRowParallel, (void *)ysmfADD);
+    }
+    
+    for ( i = 0; i < numThreads; i++ ) {
+        pthread_join(threads[i], NULL);
+    }
+    realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(int));
+    realloc(yaleMatrixC->aj, yaleMatrixC->ai[m] * sizeof(int));
     
     return yaleMatrixC;
 }
@@ -399,35 +560,35 @@ int main( int argc, const char* argv[] ) {
     srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     int **b = initSparseMatrix(m, n, perc);
-    //printMatrix(a, m, n);
-    //printMatrix(b, m, n);
-    //printf("\n");
+    printMatrix(a, m, n);
+    printMatrix(b, m, n);
+    printf("\n");
     
     //ADD matrices simple
     int **c = addSimple(a, b, m, n);
-    //printMatrix(c, m, n);
+    printMatrix(c, m, n);
     
     //Create YSMF
-    YSMF *yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
-    YSMF *yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
+    yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
+    yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
     free(a);
     free(b);
     //printYaleMatrix(yaleMatrixA);
     //printf("\n");
     //printf("\n");
     //printYaleMatrix(yaleMatrixB);
-    int **matrix = convertFromYale(yaleMatrixA);
+    //int **matrix = convertFromYale(yaleMatrixA);
     //printf("\n");
     //printf("\n");
     //printMatrix(matrix, m, n);
     
     //add matrices in YSMF
-    YSMF *yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
-    printYaleMatrix(yaleMatrixC);
+    //yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+    yaleMatrixC = addYSMFParallel(yaleMatrixA, yaleMatrixB);
     free(yaleMatrixA);
     free(yaleMatrixB);
     free(threads);
-    //printYaleMatrix(yaleMatrixC);
+    printYaleMatrix(yaleMatrixC);
     //convert back to simple format
     int **cFromYale = convertFromYale(yaleMatrixC);
     //printMatrix(cFromYale, m, n);

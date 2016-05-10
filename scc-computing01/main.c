@@ -9,7 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/timeb.h>
 #include <time.h>
+#include <math.h>
 #include <limits.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -37,6 +39,7 @@ typedef struct YSMF_ADD {
 int m;
 int n;
 double perc;
+long ms;
 YSMF *yaleMatrixA;
 YSMF *yaleMatrixB;
 YSMF *yaleMatrixC;
@@ -552,7 +555,7 @@ int main( int argc, const char* argv[] ) {
     n = atoi(argv[2]);
     perc = atof(argv[3]);
     numThreads = atoi(argv[4]);
-    int i, j;
+
     //Validation
     if ( perc < 0.0 || perc > 1.0 ) {
         printf("percentage invalid: must be a value between 0.0 and 0.99999\n");
@@ -574,28 +577,29 @@ int main( int argc, const char* argv[] ) {
     srand(time(NULL));
     int **a = initSparseMatrix(m, n, perc);
     //Create YSMF
+    printf("%lu\n", sizeof(int));
+    printf("%f", (double)(8 * m * n / 1024 ));
     yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     free(a);
     int **b = initSparseMatrix(m, n, perc);
     yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
     free(b);
     
-    struct timeval  tv;
-    gettimeofday(&tv, NULL);
-    double start_mill =
-    (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000 ;
+    struct timeb start, end;
+    ftime(&start);
+    
     if ( numThreads == 1 ) {
         yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
     } else {
         numThreads++;
         yaleMatrixC = addYSMFParallel(yaleMatrixA, yaleMatrixB);
     }
-
-    gettimeofday(&tv, NULL);
-    double end_mill =
-    (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000 ;
-
-    printf("duration: %f", end_mill - start_mill);
+    ftime(&end);
+    
+    printf("Matrix Addition took %d ms.\n",(int) (1000.0 * (end.time - start.time) + (end.millitm - start.millitm)));
+    printf("Number of Threads: %d\n", numThreads);
+    printf("m x n: %d x %d\n", m, n);
+    printf("Non Zero Values: %d%% \n", (int) (perc * 100));
     free(yaleMatrixA);
     free(yaleMatrixB);
     free(threads);

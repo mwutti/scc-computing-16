@@ -39,7 +39,7 @@ typedef struct YSMF_ADD {
 int m;
 int n;
 double perc;
-long ms;
+struct timeb start, end;
 YSMF *yaleMatrixA;
 YSMF *yaleMatrixB;
 YSMF *yaleMatrixC;
@@ -157,71 +157,32 @@ void printYaleMatrix(YSMF *matrix) {
  * perc percantage of non zero elements in Matrix
  */
 int** initSparseMatrix(int m, int n, double perc) {
-    const int nonZeroCount = m * n * perc;
+    ftime(&start);
     int **a = (int**)malloc(m * sizeof(int *));
     
-    int i;
+    int i, j;
     for (i = 0 ; i < m; i++ ) {
         a[i] =(int *) calloc(n * sizeof(int), sizeof(int));
     }
     
+    ftime(&end);
+    
+    printf("sparse matrix alloc took %d ms.\n",(int) (1000.0 * (end.time - start.time) + (end.millitm - start.millitm)));
     //set nonZeroCount x random value into random place in matrices
-    for (i = 0; i < nonZeroCount; i++) {
-        int randM, randN;
-        do {
-            randM = rand() % m;
-            randN = rand() % n;
-        } while (a[randM][randN] != 0);
-        
-        a[randM][randN] = rand() % 9 + 1;
-
-    }
-    return a;
-}
-
-void *initRow(void *init_struct) {
-    INIT_STRUCT *init = (INIT_STRUCT *)init_struct;
-    while ( init->row < m ) {
-        pthread_mutex_lock(&mu1);
-        int row = init->row++;
-        if ( row < m ) {
-            init->matrix[row] =(int *) calloc(n * sizeof(int), sizeof(int));
+    ftime(&start);
+    int random;
+    
+    for (i = 0; i < m; i++) {
+        for ( j = 0; j < n; j++ ) {
+            random = (rand() % 100) + 1 ;
+            if ( random < perc * 100 ) {
+                a[i][j] = rand() % 9 + 1;
+            }
         }
-        pthread_mutex_unlock(&mu1);
     }
-
-    return (NULL);
-}
-
-
-int ** initSparseMatrixParallel(int m, int n, double perc) {
-    const int nonZeroCount = m * n * perc;
-    int **a = (int**)malloc(m * sizeof(int *));
-    int i;
-    
-    INIT_STRUCT *init = (INIT_STRUCT *)malloc(sizeof(INIT_STRUCT *));
-    init->matrix = a;
-    init->row = 0;
-    
-    pthread_mutex_init(&mu1, NULL);
-    for ( i = 0; i < numThreads ; i++ ) {
-        pthread_create(&threads[i], NULL, initRow, (void *)init);
-    }
-    
-    for ( i = 0; i < numThreads ; i++ ) {
-        pthread_join(threads[i], NULL);
-    }
-    
-    for (i = 0; i < nonZeroCount; i++) {
-        int randM, randN;
-        do {
-            randM = rand() % m;
-            randN = rand() % n;
-        } while (a[randM][randN] != 0);
-        
-        a[randM][randN] = rand() % 9 + 1;
-    }
-    
+    ftime(&end);
+    printf("sparse matrix init took %d ms.\n",(int) (1000.0 * (end.time - start.time) + (end.millitm - start.millitm)));
+    ftime(&end);
     return a;
 }
 
@@ -534,12 +495,24 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
             totalAdded++;
         }
         yaleMatrixC->ai[i+1] = totalAdded;
+        free(ysmfADD->tempA[i]);
+        free(ysmfADD->tempAJ[i]);
     }
     
-    //realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(int));
-    //realloc(yaleMatrixC->aj, yaleMatrixC->ai[m] * sizeof(int));
+    realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(int));
+    realloc(yaleMatrixC->aj, yaleMatrixC->ai[m] * sizeof(int));
     
     return yaleMatrixC;
+}
+
+void freeMatrix(int **matrix) {
+    int i;
+    
+    for ( i = 0; i < m ; i++ ) {
+        free(matrix[i]);
+    }
+    
+    free(matrix);
 }
 
 int main( int argc, const char* argv[] ) {
@@ -575,19 +548,20 @@ int main( int argc, const char* argv[] ) {
     threads = malloc(sizeof(pthread_t) * numThreads);
     //Init Sparse Matrices
     srand(time(NULL));
+    printf("init matrix a\n");
     int **a = initSparseMatrix(m, n, perc);
     //Create YSMF
-    printf("%lu\n", sizeof(int));
-    printf("%f", (double)(8 * m * n / 1024 ));
     yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
-    free(a);
+    printf("create yale matrix a\n");
+    freeMatrix(a);
     int **b = initSparseMatrix(m, n, perc);
+    printf("init matrix b\n");
     yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
-    free(b);
+    printf("create yale matrix a\n");
+    freeMatrix(b);
     
-    struct timeb start, end;
     ftime(&start);
-    
+    printf("YSMF addition\n");
     if ( numThreads == 1 ) {
         yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
     } else {

@@ -237,6 +237,7 @@
 				4CC2621C1CD62A2A00CEE98A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

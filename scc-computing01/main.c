@@ -14,19 +14,12 @@
 #include <math.h>
 #include <limits.h>
 #include <pthread.h>
-#include <stdbool.h>
 
 typedef struct YSMF {
-    int *a;
-    int *ai;
-    int *aj;
-} YSMF;
-
-typedef struct YSMF_CHAR {
     char *a;
     int *ai;
     int *aj;
-} YSMF_CHAR;
+} YSMF;
 
 typedef struct YSMF_ADD {
     int row;
@@ -65,7 +58,7 @@ YSMF *initYaleMatrix(char** matrix, int m, int n, int nonZeros) {
     
     yaleMatrix->aj = (int *)malloc(nonZeros * sizeof(int));
     yaleMatrix->ai = (int *)malloc((m+1) * sizeof(int));
-    yaleMatrix->a = (int *)malloc(nonZeros * sizeof(int));
+    yaleMatrix->a = (char *)malloc(nonZeros * sizeof(char));
     
     if ( yaleMatrix->a == NULL ) {
         free(yaleMatrix);
@@ -157,7 +150,6 @@ void printYaleMatrix(YSMF *matrix) {
  * perc percantage of non zero elements in Matrix
  */
 char** initSparseMatrix(int m, int n, double perc) {
-    ftime(&start);
     char **a = (char**)malloc(m * sizeof(char *));
     
     int i, j;
@@ -165,9 +157,6 @@ char** initSparseMatrix(int m, int n, double perc) {
         a[i] =(char *) calloc(n * sizeof(char), sizeof(char));
     }
     
-    ftime(&end);
-    
-    printf("sparse matrix alloc took %d ms.\n",(int) (1000.0 * (end.time - start.time) + (end.millitm - start.millitm)));
     //set nonZeroCount x random value into random place in matrices
     ftime(&start);
     int random;
@@ -237,7 +226,7 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
     // optimistic allocation of a and ai with nonZerosA +nonZerosB ... reallocated when finished
     yaleMatrixC->aj = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
     yaleMatrixC->ai = (int *)malloc((m + 1) * sizeof(int));
-    yaleMatrixC->a = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
+    yaleMatrixC->a = (char *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(char));
     
     if ( yaleMatrixC->a == NULL ) {
         free(yaleMatrixC);
@@ -334,7 +323,7 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
             aiC++;
         }
     }
-    realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(int));
+    realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(char));
     realloc(yaleMatrixC->aj, yaleMatrixC->ai[m] * sizeof(int));
     
     return yaleMatrixC;
@@ -446,7 +435,7 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
     // optimistic allocation of a and ai with nonZerosA +nonZerosB ... reallocated when finished
     yaleMatrixC->aj = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
     yaleMatrixC->ai = (int *)malloc((m + 1) * sizeof(int));
-    yaleMatrixC->a = (int *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(int));
+    yaleMatrixC->a = (char *)malloc((yaleMatrixA->ai[m] + yaleMatrixB->ai[m]) * sizeof(char));
     
     if ( yaleMatrixC->a == NULL ) {
         free(yaleMatrixC);
@@ -515,6 +504,21 @@ void freeMatrix(char **matrix) {
     free(matrix);
 }
 
+float sizeOfYale(YSMF *yale) {
+    float size = 0;
+    int i;
+    
+    for ( i = 0; i < yale->ai[m]; i++ ) {
+        size += sizeof(yale->a[i]);
+        size += sizeof(yale->aj[i]);
+    }
+    
+    for ( i = 0; i < m + 1; i++ ) {
+        size += sizeof(yale->ai[i]);
+    }
+    return size;
+}
+
 int main( int argc, const char* argv[] ) {
     //arg[0], arg[1] -> m x n
     //arg[2] perc. of non 0 values
@@ -523,7 +527,7 @@ int main( int argc, const char* argv[] ) {
         printf("usage: <m> <n> <percantage of non 0 values> <#threads>\n");
         return -1;
     }
-    
+
     m = atoi(argv[1]);
     n = atoi(argv[2]);
     perc = atof(argv[3]);
@@ -545,14 +549,24 @@ int main( int argc, const char* argv[] ) {
         return -1;
     }//Validation
     
+    if ( n > 65600 ) {
+        printf("n max: 65500");
+        return -1;
+    }//Validation
+    
+    if ( m > 65500 ) {
+        printf("m max: 65500");
+        return -1;
+    }
+    
     threads = malloc(sizeof(pthread_t) * numThreads);
     //Init Sparse Matrices
     srand(time(NULL));
     printf("init matrix a\n");
     char **a = initSparseMatrix(m, n, perc);
     //Create YSMF
-    yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     printf("create yale matrix a\n");
+    yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     freeMatrix(a);
     char **b = initSparseMatrix(m, n, perc);
     printf("init matrix b\n");
@@ -562,6 +576,7 @@ int main( int argc, const char* argv[] ) {
     
     ftime(&start);
     printf("YSMF addition\n");
+
     if ( numThreads == 1 ) {
         yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
     } else {

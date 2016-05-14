@@ -23,8 +23,8 @@ typedef struct YSMF {
 
 typedef struct YSMF_ADD {
     int row;
-    short *added;
-    int **tempA;
+    char *added;
+    char **tempA;
     int *tempAI;
     int **tempAJ;
 } YSMF_ADD;
@@ -348,7 +348,7 @@ void * addRowParallel(void *ysmf_add) {
             } else if ( yaleMatrixA->ai[myRow + 1] - yaleMatrixA->ai[myRow] == 0) { // in Matrix B there is at least 1 nonZero value
                 int nonZeros = yaleMatrixB->ai[myRow + 1] - yaleMatrixB->ai[myRow]; // how many nonZeros in this row?
                 ysmfADD->tempAJ[myRow] = (int *) malloc(nonZeros * sizeof(int));
-                ysmfADD->tempA[myRow] = (int *) malloc(nonZeros * sizeof(int));
+                ysmfADD->tempA[myRow] = (char *) malloc(nonZeros * sizeof(char));
                 
                 ysmfADD->tempAI[myRow] = nonZeros;
                 
@@ -361,7 +361,7 @@ void * addRowParallel(void *ysmf_add) {
             } else if ( yaleMatrixB->ai[myRow + 1] - yaleMatrixB->ai[myRow] == 0) { // in Matrix A there is at least 1 nonZero value
                 int nonZeros = yaleMatrixA->ai[myRow + 1] - yaleMatrixA->ai[myRow];
                 ysmfADD->tempAJ[myRow] = (int *)malloc(nonZeros * sizeof(int));
-                ysmfADD->tempA[myRow] = (int *)malloc(nonZeros * sizeof(int));
+                ysmfADD->tempA[myRow] = (char *)malloc(nonZeros * sizeof(char));
                 
                 ysmfADD->tempAI[myRow] = nonZeros;
                 
@@ -377,7 +377,7 @@ void * addRowParallel(void *ysmf_add) {
                 int nonZerosB = yaleMatrixB->ai[myRow + 1] - yaleMatrixB->ai[myRow];
                 int jA = 0, jB = 0;
                 ysmfADD->tempAJ[myRow] = (int *)malloc((nonZerosA + nonZerosB) * sizeof(int));
-                ysmfADD->tempA[myRow] = (int *)malloc((nonZerosA + nonZerosB) * sizeof(int));
+                ysmfADD->tempA[myRow] = (char *)malloc((nonZerosA + nonZerosB) * sizeof(char));
                 
                 
                 for (i = 0; (nonZerosA > 0 && nonZerosB > 0); i++ ) {    // Start iterating over nonZeros
@@ -462,12 +462,13 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
 
     YSMF_ADD *ysmfADD = (YSMF_ADD *)malloc(sizeof(YSMF_ADD));
     ysmfADD->row = 0;
-    ysmfADD->tempA = (int **)malloc(m * sizeof(int*));
+    ysmfADD->tempA = (char **)malloc(m * sizeof(char*));
     ysmfADD->tempAJ = (int **)malloc(m * sizeof(int*));
     ysmfADD->tempAI = (int *)malloc(m * sizeof(int));
-    ysmfADD->added = (short *)calloc(sizeof(short), m * sizeof(short));
+    ysmfADD->added = (char *)calloc(sizeof(char), m * sizeof(char));
     
     for ( i = 0; i < numThreads; i++ ) {
+        printf("create Tread: %d\n", i + 1);
         pthread_create(&threads[i], NULL, addRowParallel, (void *)ysmfADD);
     }
 
@@ -488,7 +489,7 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
         free(ysmfADD->tempAJ[i]);
     }
     
-    realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(int));
+    realloc(yaleMatrixC->a, yaleMatrixC->ai[m] * sizeof(char));
     realloc(yaleMatrixC->aj, yaleMatrixC->ai[m] * sizeof(int));
     
     return yaleMatrixC;
@@ -549,29 +550,19 @@ int main( int argc, const char* argv[] ) {
         return -1;
     }//Validation
     
-    if ( n > 65600 ) {
-        printf("n max: 65500");
-        return -1;
-    }//Validation
-    
-    if ( m > 65500 ) {
-        printf("m max: 65500");
-        return -1;
-    }
-    
     threads = malloc(sizeof(pthread_t) * numThreads);
     //Init Sparse Matrices
     srand(time(NULL));
     printf("init matrix a\n");
     char **a = initSparseMatrix(m, n, perc);
-    //Create YSMF
     printf("create yale matrix a\n");
     yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     freeMatrix(a);
-    char **b = initSparseMatrix(m, n, perc);
     printf("init matrix b\n");
+    char **b = initSparseMatrix(m, n, perc);
+    printf("create yale matrix b\n");
     yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
-    printf("create yale matrix a\n");
+
     freeMatrix(b);
     
     ftime(&start);
@@ -580,7 +571,6 @@ int main( int argc, const char* argv[] ) {
     if ( numThreads == 1 ) {
         yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
     } else {
-        numThreads++;
         yaleMatrixC = addYSMFParallel(yaleMatrixA, yaleMatrixB);
     }
     ftime(&end);

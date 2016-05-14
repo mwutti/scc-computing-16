@@ -100,12 +100,10 @@ YSMF *initYaleMatrix(char** matrix, int m, int n, int nonZeros) {
 }
 
 /**
- * Prints matrix
- * matrix matrix
- * m Number of rows of matrix
- * n Number of columns of matrix
+ * Matrix in simple format
+ * Prints matrix in simple format
  */
-void printMatrix(int **matrix, int m, int n) {
+void printMatrix(int **matrix) {
     int i;
     int j;
     for ( i = 0 ; i < m ; i++ ) {
@@ -118,8 +116,8 @@ void printMatrix(int **matrix, int m, int n) {
 }
 
 /**
- * prints YSMF
- *
+ * matrix Matrix in YSMF
+ * Prints Matrix in YSMF
  */
 void printYaleMatrix(YSMF *matrix) {
     int i;
@@ -178,12 +176,12 @@ char** initSparseMatrix(int m, int n, double perc) {
 /**
  * Converts a YSMF into a simple Matrix format
  */
-int** convertFromYale(YSMF *yaleMatrix) {
+char** convertFromYale(YSMF *yaleMatrix) {
     int i, j, indexAJ = 0, indexA = 0;
-    int **matrix = (int**)malloc(m * sizeof(int*));
+    char **matrix = (char **)malloc(m * sizeof(char *));
     
     for ( i = 0; i < m; i++ ) {
-        matrix[i] = (int*) calloc(n * sizeof(int), sizeof(int));
+        matrix[i] = (char *) calloc(n * sizeof(char), sizeof(char));
     }
     
     //iterate over Ai[]
@@ -199,12 +197,19 @@ int** convertFromYale(YSMF *yaleMatrix) {
     return matrix;
 }
 
-int** addSimple(int **a, int **b, int m, int n) {
-    int **c = (int**)malloc(m * sizeof(int *));
+/*
+ * a Matrix A in simple format
+ * b Matrix B in simple format
+ * m number of rows in A/B
+ * n number of columns in A/B
+ * Addition of two Matrices in simple format
+ */
+char** addSimple(char **a, char **b, int m, int n) {
+    char **c = (char **)malloc(m * sizeof(char *));
     
     int i,j;
     for ( i = 0 ; i < m; i++ ) {
-        c[i] =(int *) malloc(n * sizeof(int));
+        c[i] =(char *) malloc(n * sizeof(char));
     }
     
     for ( i = 0; i < m; i++ ) {
@@ -216,6 +221,11 @@ int** addSimple(int **a, int **b, int m, int n) {
     return c;
 }
 
+/**
+ * yaleMatrixA Matrix A in YSMF
+ * yaleMatrixB Matrix B in YSMF
+ * Single thread addition of two matrices
+ */
 YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
     yaleMatrixC = (YSMF *)malloc(sizeof(YSMF));
 
@@ -328,7 +338,10 @@ YSMF* addYSMF(YSMF *yaleMatrixA, YSMF *yaleMatrixB){
     
     return yaleMatrixC;
 }
-
+/**
+ * ysmf_add Shared Memory struct for parallel addition of matrices
+ * Thread Method for parallel addition of matrices
+ */
 void * addRowParallel(void *ysmf_add) {
     YSMF_ADD *ysmfADD = (YSMF_ADD *)ysmf_add;
     int myRow;
@@ -424,6 +437,11 @@ void * addRowParallel(void *ysmf_add) {
     return (NULL);
 }
 
+/**
+ * yaleMatrixA Matrix A in YSMF
+ * yaleMatrixB Matrix B in YSMF
+ * Parallel addition of MatrixA and MatrixB
+ */
 YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
     int i;
     yaleMatrixC = (YSMF *)malloc(sizeof(YSMF));
@@ -495,6 +513,10 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
     return yaleMatrixC;
 }
 
+/*
+ * matrix Matrix to free
+ * frees the memory for given matrix
+ */
 void freeMatrix(char **matrix) {
     int i;
     
@@ -505,19 +527,23 @@ void freeMatrix(char **matrix) {
     free(matrix);
 }
 
-float sizeOfYale(YSMF *yale) {
-    float size = 0;
+/*
+ * a matrix in simple format
+ * b matrix in YSMF
+ * returns 0 if the matrices are equal -1 else
+ */
+char checkMatrices(char **a, YSMF *b) {
+    char **converted = convertFromYale(b);
     int i;
-    
-    for ( i = 0; i < yale->ai[m]; i++ ) {
-        size += sizeof(yale->a[i]);
-        size += sizeof(yale->aj[i]);
+    int j;
+    for ( i = 0; i < m; i++ ) {
+        for ( j = 0; j < n; j++) {
+            if ( a[i][j] != converted[i][j] ) {
+                return -1;
+            }
+        }
     }
-    
-    for ( i = 0; i < m + 1; i++ ) {
-        size += sizeof(yale->ai[i]);
-    }
-    return size;
+    return 0;
 }
 
 int main( int argc, const char* argv[] ) {
@@ -550,38 +576,47 @@ int main( int argc, const char* argv[] ) {
         return -1;
     }//Validation
     
-    threads = malloc(sizeof(pthread_t) * numThreads);
-    //Init Sparse Matrices
     srand(time(NULL));
+    
     printf("init matrix a\n");
     char **a = initSparseMatrix(m, n, perc);
-    printf("create yale matrix a\n");
     yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
-    freeMatrix(a);
+
     printf("init matrix b\n");
     char **b = initSparseMatrix(m, n, perc);
-    printf("create yale matrix b\n");
     yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
-
+    
+    char **c = addSimple(a, b, m, n);
     freeMatrix(b);
+    freeMatrix(a);
+    
+    printf("YSMF addition\n");
     
     ftime(&start);
-    printf("YSMF addition\n");
-
     if ( numThreads == 1 ) {
         yaleMatrixC = addYSMF(yaleMatrixA, yaleMatrixB);
+        ftime(&end);
     } else {
+        threads = malloc(sizeof(pthread_t) * numThreads);
         yaleMatrixC = addYSMFParallel(yaleMatrixA, yaleMatrixB);
+        ftime(&end);
+        
+        free(threads);
     }
-    ftime(&end);
+    
+    free(yaleMatrixA);
+    free(yaleMatrixB);
     
     printf("Matrix Addition took %d ms.\n",(int) (1000.0 * (end.time - start.time) + (end.millitm - start.millitm)));
     printf("Number of Threads: %d\n", numThreads);
     printf("m x n: %d x %d\n", m, n);
     printf("Non Zero Values: %d%% \n", (int) (perc * 100));
-    free(yaleMatrixA);
-    free(yaleMatrixB);
-    free(threads);
+    
+    if ( checkMatrices(c, yaleMatrixC) != 0 ) {
+        printf("Something went wrong\n");
+    }
+    
+    free(yaleMatrixC);
     return 0;
 }
 

@@ -22,11 +22,11 @@ typedef struct YSMF {
     int *aj;
 } YSMF;
 
-// Struct or parallel initialization of Sparse Matrices
-typedef struct INIT_STRUCT {
-    int row;
-    int **matrix;
-} INIT_STRUCT;
+typedef struct YSMF_CHAR {
+    char *a;
+    int *ai;
+    int *aj;
+} YSMF_CHAR;
 
 typedef struct YSMF_ADD {
     int row;
@@ -57,7 +57,7 @@ pthread_mutex_t mu3;
  * n Number of Columns of matrix
  * nonZeros number of non zero elements in matrix (easier allocation of ai and aj)
  */
-YSMF *initYaleMatrix(int** matrix, int m, int n, int nonZeros) {
+YSMF *initYaleMatrix(char** matrix, int m, int n, int nonZeros) {
     YSMF *yaleMatrix = (YSMF *)malloc(sizeof(YSMF));
     if ( yaleMatrix == NULL ) {
         return NULL;
@@ -156,13 +156,13 @@ void printYaleMatrix(YSMF *matrix) {
  * n Columns of matrix
  * perc percantage of non zero elements in Matrix
  */
-int** initSparseMatrix(int m, int n, double perc) {
+char** initSparseMatrix(int m, int n, double perc) {
     ftime(&start);
-    int **a = (int**)malloc(m * sizeof(int *));
+    char **a = (char**)malloc(m * sizeof(char *));
     
     int i, j;
     for (i = 0 ; i < m; i++ ) {
-        a[i] =(int *) calloc(n * sizeof(int), sizeof(int));
+        a[i] =(char *) calloc(n * sizeof(char), sizeof(char));
     }
     
     ftime(&end);
@@ -176,7 +176,7 @@ int** initSparseMatrix(int m, int n, double perc) {
         for ( j = 0; j < n; j++ ) {
             random = (rand() % 100) + 1 ;
             if ( random < perc * 100 ) {
-                a[i][j] = rand() % 9 + 1;
+                a[i][j] = rand() % 8 + 1;
             }
         }
     }
@@ -505,7 +505,7 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
     return yaleMatrixC;
 }
 
-void freeMatrix(int **matrix) {
+void freeMatrix(char **matrix) {
     int i;
     
     for ( i = 0; i < m ; i++ ) {
@@ -549,12 +549,12 @@ int main( int argc, const char* argv[] ) {
     //Init Sparse Matrices
     srand(time(NULL));
     printf("init matrix a\n");
-    int **a = initSparseMatrix(m, n, perc);
+    char **a = initSparseMatrix(m, n, perc);
     //Create YSMF
     yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
     printf("create yale matrix a\n");
     freeMatrix(a);
-    int **b = initSparseMatrix(m, n, perc);
+    char **b = initSparseMatrix(m, n, perc);
     printf("init matrix b\n");
     yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
     printf("create yale matrix a\n");

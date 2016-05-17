@@ -40,8 +40,6 @@ YSMF *yaleMatrixC;
 int numThreads;
 pthread_t * threads;
 pthread_mutex_t mu1;
-pthread_mutex_t mu2;
-pthread_mutex_t mu3;
 
 /**
  * Creates a YSMF from given matrix a
@@ -476,7 +474,6 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
     //Start parallel
     
     pthread_mutex_init(&mu1, NULL);
-    pthread_mutex_init(&mu2, NULL);
 
     YSMF_ADD *ysmfADD = (YSMF_ADD *)malloc(sizeof(YSMF_ADD));
     ysmfADD->row = 0;
@@ -486,12 +483,10 @@ YSMF* addYSMFParallel(YSMF *yaleMatrixA, YSMF *yaleMatrixB) {
     ysmfADD->added = (char *)calloc(sizeof(char), m * sizeof(char));
     
     for ( i = 0; i < numThreads; i++ ) {
-        printf("create Tread: %d\n", i + 1);
         pthread_create(&threads[i], NULL, addRowParallel, (void *)ysmfADD);
     }
 
     int j, totalAdded = 0;
-    
     
     for ( i = 0; i < m; i++ ) {
         //Busy Waiting
@@ -581,14 +576,13 @@ int main( int argc, const char* argv[] ) {
     printf("init matrix a\n");
     char **a = initSparseMatrix(m, n, perc);
     yaleMatrixA = initYaleMatrix(a, m, n, m * n * perc);
-
+    freeMatrix(a);
+    
     printf("init matrix b\n");
     char **b = initSparseMatrix(m, n, perc);
     yaleMatrixB = initYaleMatrix(b, m, n, m * n * perc);
-    
-    char **c = addSimple(a, b, m, n);
     freeMatrix(b);
-    freeMatrix(a);
+    //char **c = addSimple(a, b, m, n);
     
     printf("YSMF addition\n");
     
@@ -612,11 +606,10 @@ int main( int argc, const char* argv[] ) {
     printf("m x n: %d x %d\n", m, n);
     printf("Non Zero Values: %d%% \n", (int) (perc * 100));
     
-    if ( checkMatrices(c, yaleMatrixC) != 0 ) {
-        printf("Something went wrong\n");
-    }
+//    if ( checkMatrices(c, yaleMatrixC) != 0 ) {
+//        printf("Something went wrong\n");
+//    }
     
-    free(yaleMatrixC);
     return 0;
 }
 
